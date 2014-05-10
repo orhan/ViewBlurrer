@@ -16,7 +16,7 @@ Setup
 
 Note: this is the setup routine for Eclipse/ANT.
 
-1. Import `ViewBlurrer` as a new Android Project or download the available .jar file and add it to your build path.
+1. Import `ViewBlurrer` as a new Android Project or download the latest .jar file from [here](https://github.com/orhnsnmz/ViewBlurrer/releases) and add it to your build path.
 2. Add the following lines to your project.properties file (this references the [RenderScript support library](http://android-developers.blogspot.de/2013/09/renderscript-in-android-support-library.html)):
 ```
 renderscript.target=19
