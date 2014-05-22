@@ -282,7 +282,7 @@ public class ViewBlurrer {
 		
 		// Reset the blur if we have zero opacity
 		if (opacity == 0f)
-			resetBlur();
+			reset();
 		
 	}
 	
@@ -322,7 +322,7 @@ public class ViewBlurrer {
 		
 		// Reset the blur if we have zero opacity
 		if (opacity == 0f)
-			resetBlur();
+			reset();
 		
 	}
 	
@@ -385,27 +385,27 @@ public class ViewBlurrer {
 	
 	
 	/**
-	 * Reset our blurred image. Call this to revert the view to its original state.
+	 * Resets the ViewBlurrer, call this to revert the view to its original state.
 	 */
-	public void resetBlur() {
+	public void reset() {
 		
 		if (mBlurredBitmap != null) {
 			mBlurredBitmap.recycle();
 			mBlurredBitmap = null;
-			
-			mBlurImageView.setImageBitmap(null);
-			
-			ViewHelper.setAlpha(mBlurImageView, 0f);
-			ViewHelper.setAlpha(mOverlayView, 0f);
-			ViewHelper.setAlpha(mOriginalView, 1f);
-			
-			mBlurImageView.clearAnimation();
-			mOverlayView.clearAnimation();
-			mOriginalView.clearAnimation();
-			
-			mOriginalView.setVisibility(View.VISIBLE);
-			mOriginalView.invalidate();
 		}
+		
+		ViewHelper.setAlpha(mBlurImageView, 0f);
+		ViewHelper.setAlpha(mOverlayView, 0f);
+		ViewHelper.setAlpha(mOriginalView, 1f);
+		
+		mBlurImageView.clearAnimation();
+		mOverlayView.clearAnimation();
+		mOriginalView.clearAnimation();
+		
+		mOriginalView.setVisibility(View.VISIBLE);
+		mOriginalView.invalidate();
+		
+		mBlurImageView.setImageBitmap(null);
 		
 	}
 	
@@ -415,37 +415,64 @@ public class ViewBlurrer {
 	 */
 	private Bitmap applyBlur() {
 		
-		// Get the drawing cache of our incoming View
-		mOriginalView.buildDrawingCache();
-		Bitmap originalBitmap = mOriginalView.getDrawingCache().copy(Config.ARGB_8888, true);
-		mOriginalView.destroyDrawingCache();
+		Bitmap resultBitmap = null;
 		
-		
-		// Define a resulting Bitmap
-		Bitmap resultBitmap = Bitmap.createScaledBitmap(originalBitmap, originalBitmap.getWidth() / mScaleSize, originalBitmap.getHeight() / mScaleSize, true);
-		
-
-		// Do this only if we want to apply a RS-blur
-		if (mBlurRadius > 0f) {
+		try {
 			
-			// Get a new RenderScript object
-	    	RenderScript renderScript = RenderScript.create(mContext);
+			// Do some garbage collection first
+			System.gc();
+			
+			
+			// Get the drawing cache of our incoming View
+			mOriginalView.buildDrawingCache();
+			Bitmap originalBitmap = mOriginalView.getDrawingCache().copy(Config.ARGB_8888, true);
+			mOriginalView.destroyDrawingCache();
+			
+			
+			// Define a resulting Bitmap
+			resultBitmap = Bitmap.createScaledBitmap(originalBitmap, originalBitmap.getWidth() / mScaleSize, originalBitmap.getHeight() / mScaleSize, true);
+			
+	
+			// Recycle the original bitmap
+			originalBitmap.recycle();
+			originalBitmap = null;
+			
+			
+			// Do this only if we want to apply a RS-blur
+			if (mBlurRadius > 0f) {
+				
+				// Get a new RenderScript object
+		    	RenderScript renderScript = RenderScript.create(mContext);
+		    	
+		        final Allocation input = Allocation.createFromBitmap(renderScript, resultBitmap, Allocation.MipmapControl.MIPMAP_NONE, Allocation.USAGE_SHARED);
+		        final Allocation output = Allocation.createFromBitmap(renderScript, resultBitmap, Allocation.MipmapControl.MIPMAP_NONE, Allocation.USAGE_SHARED);
+		        final ScriptIntrinsicBlur script = ScriptIntrinsicBlur.create(renderScript, Element.U8_4(renderScript));
+		        
+		        script.setRadius(mBlurRadius);
+		        script.setInput(input);
+		        script.forEach(output);
+		        
+		        renderScript.finish();
+		        output.copyTo(resultBitmap);
+		        
+		    	renderScript.destroy();
+		    	renderScript = null;
 	    	
-	        final Allocation input = Allocation.createFromBitmap(renderScript, resultBitmap, Allocation.MipmapControl.MIPMAP_NONE, Allocation.USAGE_SHARED);
-	        final Allocation output = Allocation.createFromBitmap(renderScript, resultBitmap, Allocation.MipmapControl.MIPMAP_NONE, Allocation.USAGE_SHARED);
-	        final ScriptIntrinsicBlur script = ScriptIntrinsicBlur.create(renderScript, Element.U8_4(renderScript));
-	        
-	        script.setRadius(mBlurRadius);
-	        script.setInput(input);
-	        script.forEach(output);
-	        
-	        renderScript.finish();
-	        output.copyTo(resultBitmap);
-	        
-	    	renderScript.destroy();
-	    	renderScript = null;
-    	
+			}
+			
 		}
+		
+		catch (OutOfMemoryError e) {
+			e.printStackTrace();
+		}
+		
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		
+		// Do a garbage collection 
+		System.gc();
 		
 		
 		// Return our result
